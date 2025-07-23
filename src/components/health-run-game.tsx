@@ -230,9 +230,13 @@ export default function HealthRunGame() {
     }
 
     if (itemTimerRef.current > itemSpawnThreshold && itemsRef.current.length < 7) {
-        const itemType = Math.random() < 0.65 ? 'beer' : 'water';
+        const beerChance = scoreRef.current > 1000 ? 0.8 : 0.65;
+        const doubleBeerChance = scoreRef.current > 1000 ? 0.3 : 0;
+        
+        const itemType = Math.random() < beerChance ? 'beer' : 'water';
         const height = itemType === 'beer' ? 30 : 40;
         const width = 20;
+
         itemsRef.current.push({
             x: canvas.width,
             y: canvas.height - height - 10,
@@ -240,6 +244,16 @@ export default function HealthRunGame() {
             height,
             type: itemType,
         });
+
+        if (itemType === 'beer' && Math.random() < doubleBeerChance) {
+             itemsRef.current.push({
+                x: canvas.width + width + 10, // Spawn second beer can right after the first
+                y: canvas.height - height - 10,
+                width,
+                height,
+                type: 'beer',
+            });
+        }
         itemTimerRef.current = 0;
     }
     
