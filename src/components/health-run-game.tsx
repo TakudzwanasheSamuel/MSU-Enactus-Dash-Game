@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -119,23 +120,6 @@ export default function HealthRunGame() {
     }
   }, []);
 
-  const startGame = useCallback(() => {
-    if (playerImageRef.current?.complete) {
-        resetGame();
-        setGameStarted(true);
-        setIsGameOver(false);
-    } else {
-        // Image not loaded yet, wait for it
-        if (playerImageRef.current) {
-            playerImageRef.current.onload = () => {
-                resetGame();
-                setGameStarted(true);
-                setIsGameOver(false);
-            }
-        }
-    }
-  }, []);
-
   const resetGame = useCallback(() => {
     setScore(0);
     scoreRef.current = 0;
@@ -157,6 +141,23 @@ export default function HealthRunGame() {
     setAdaptiveMessage('');
     setIsPaused(false);
   }, [resizeCanvas]);
+  
+  const startGame = useCallback(() => {
+    if (playerImageRef.current?.complete && !playerImageRef.current.src.includes('broken')) {
+        resetGame();
+        setGameStarted(true);
+        setIsGameOver(false);
+    } else {
+        // Image not loaded yet, wait for it
+        if (playerImageRef.current) {
+            playerImageRef.current.onload = () => {
+                resetGame();
+                setGameStarted(true);
+                setIsGameOver(false);
+            }
+        }
+    }
+  }, [resetGame]);
 
   const endGame = useCallback(() => {
     setIsGameOver(true);
@@ -205,7 +206,8 @@ export default function HealthRunGame() {
       setHighscore(Number(storedHighscore));
     }
     const image = new window.Image();
-    image.src = '/player.png';
+    image.crossOrigin = "anonymous"; // Required for placehold.co images
+    image.src = `https://placehold.co/${PLAYER_WIDTH}x${PLAYER_HEIGHT}.png`;
     playerImageRef.current = image;
 
     resizeCanvas();
@@ -238,8 +240,14 @@ export default function HealthRunGame() {
       player.isJumping = false;
     }
 
-    if (playerImageRef.current && playerImageRef.current.complete) {
-        ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
+    if (playerImageRef.current && playerImageRef.current.complete && !playerImageRef.current.src.includes('broken')) {
+        try {
+            ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
+        } catch (error) {
+            console.error("Error drawing player image:", error);
+            ctx.fillStyle = '#333';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
     } else {
         ctx.fillStyle = '#333';
         ctx.fillRect(player.x, player.y, player.width, player.height);
@@ -442,6 +450,7 @@ export default function HealthRunGame() {
           onTouchEnd={onTouchEnd}
           onClick={handleJump}
           className="w-full bg-background rounded-lg shadow-2xl" 
+          data-ai-hint="running person"
         />
         
         <div className="w-full flex justify-center gap-4 mt-4">
