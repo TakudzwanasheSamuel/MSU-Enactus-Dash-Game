@@ -90,6 +90,61 @@ export default function HealthRunGame() {
   const shownMessagesRef = useRef<Set<number>>(new Set());
   const { toast } = useToast();
 
+  const resetGame = useCallback(() => {
+    setScore(0);
+    scoreRef.current = 0;
+    gameSpeedRef.current = 5;
+    itemsRef.current = [];
+    itemTimerRef.current = 0;
+    shownMessagesRef.current.clear();
+    
+    const canvas = canvasRef.current;
+    if (canvas) {
+        playerRef.current.y = canvas.height - playerRef.current.height;
+    }
+    playerRef.current.dy = 0;
+    playerRef.current.isJumping = false;
+    
+    setHealth(MAX_HEALTH);
+    setAdaptiveMessage('');
+    setIsPaused(false);
+  }, []);
+
+  const endGame = useCallback(() => {
+    setIsGameOver(true);
+    setGameStarted(false);
+    setIsPaused(false);
+    if (scoreRef.current > highscore) {
+      const newHighscore = scoreRef.current;
+      setHighscore(newHighscore);
+      localStorage.setItem('healthRunHighscore', String(newHighscore));
+    }
+
+    setIsLoadingMessage(true);
+    generateAdaptiveMessage({ score: scoreRef.current, health })
+      .then(result => setAdaptiveMessage(result.message))
+      .catch(error => {
+        console.error("Failed to generate message:", error);
+        setAdaptiveMessage("Remember to always make healthy choices.");
+      })
+      .finally(() => setIsLoadingMessage(false));
+  }, [highscore, health]);
+
+  const startGame = useCallback(() => {
+    resetGame();
+    setGameStarted(true);
+    setIsGameOver(false);
+  }, [resetGame]);
+
+  const handleJump = useCallback(() => {
+    if (!gameStarted) {
+      startGame();
+    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
+      playerRef.current.isJumping = true;
+      playerRef.current.dy = playerRef.current.jumpPower;
+    }
+  }, [gameStarted, isGameOver, isPaused, startGame]);
+
   const updateHealth = (newHealth: number) => {
     const clampedHealth = Math.max(0, Math.min(MAX_HEALTH, newHealth));
     setHealth(clampedHealth);
@@ -133,62 +188,6 @@ export default function HealthRunGame() {
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [resizeCanvas]);
-
-  const resetGame = () => {
-    setScore(0);
-    scoreRef.current = 0;
-    gameSpeedRef.current = 5;
-    itemsRef.current = [];
-    itemTimerRef.current = 0;
-    shownMessagesRef.current.clear();
-    
-    const canvas = canvasRef.current;
-    if (canvas) {
-        playerRef.current.y = canvas.height - playerRef.current.height;
-    }
-    playerRef.current.dy = 0;
-    playerRef.current.isJumping = false;
-    
-    setHealth(MAX_HEALTH);
-    setAdaptiveMessage('');
-    setIsPaused(false);
-  };
-  
-  const handleJump = useCallback(() => {
-    if (!gameStarted) {
-      startGame();
-    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
-      playerRef.current.isJumping = true;
-      playerRef.current.dy = playerRef.current.jumpPower;
-    }
-  }, [gameStarted, isGameOver, isPaused]);
-
-  const startGame = () => {
-    resetGame();
-    setGameStarted(true);
-    setIsGameOver(false);
-    handleJump();
-  };
-
-  const endGame = useCallback(() => {
-    setIsGameOver(true);
-    setGameStarted(false);
-    setIsPaused(false);
-    if (scoreRef.current > highscore) {
-      const newHighscore = scoreRef.current;
-      setHighscore(newHighscore);
-      localStorage.setItem('healthRunHighscore', String(newHighscore));
-    }
-
-    setIsLoadingMessage(true);
-    generateAdaptiveMessage({ score: scoreRef.current, health })
-      .then(result => setAdaptiveMessage(result.message))
-      .catch(error => {
-        console.error("Failed to generate message:", error);
-        setAdaptiveMessage("Remember to always make healthy choices.");
-      })
-      .finally(() => setIsLoadingMessage(false));
-  }, [highscore, health]);
 
   const gameLoop = useCallback(() => {
     if (isGameOver || isPaused) return;
@@ -376,6 +375,7 @@ export default function HealthRunGame() {
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
+          onClick={handleJump}
           className="w-full bg-background rounded-lg shadow-2xl" 
         />
         
