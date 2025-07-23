@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Health Run',
+  title: 'Dash',
   description: 'An educational game about the effects of underage drinking.',
 };
 

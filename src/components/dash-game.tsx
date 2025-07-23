@@ -55,7 +55,7 @@ const educationalMessages = [
     { score: 3000, message: "Binge drinking can lead to alcohol poisoning, a serious and sometimes deadly condition." },
 ];
 
-export default function HealthRunGame() {
+export default function DashGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameContainerRef = useRef<HTMLDivElement | null>(null);
   const playerImageRef = useRef<HTMLImageElement | null>(null);
@@ -417,8 +417,8 @@ export default function HealthRunGame() {
   
   return (
     <div ref={gameContainerRef} className="w-full max-w-4xl flex flex-col items-center font-headline">
-        <div className="w-full grid grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
-            <Card>
+        <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
+            <Card className="col-span-2 sm:col-span-1">
                 <CardHeader className="p-2 sm:p-4">
                     <CardTitle className="text-sm sm:text-lg">Score</CardTitle>
                 </CardHeader>
@@ -428,18 +428,18 @@ export default function HealthRunGame() {
             </Card>
             <Card>
                 <CardHeader className="p-2 sm:p-4">
-                    <CardTitle className="text-sm sm:text-lg">Health</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 sm:p-4">
-                    <Progress value={health} className="h-4 sm:h-6" />
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="p-2 sm:p-4">
                      <CardTitle className="text-sm sm:text-lg">High Score</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2 sm:p-4">
                     <p className="text-lg sm:text-2xl">{highscore}</p>
+                </CardContent>
+            </Card>
+            <Card className="col-span-2">
+                <CardHeader className="p-2 sm:p-4">
+                    <CardTitle className="text-sm sm:text-lg">Health</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-4 flex items-center justify-center">
+                    <Progress value={health} className="h-4 sm:h-6 w-full" />
                 </CardContent>
             </Card>
         </div>
@@ -472,7 +472,7 @@ export default function HealthRunGame() {
             <AlertDialogContent className="font-headline text-center">
                 <AlertDialogHeader>
                     <AlertDialogTitle className="text-3xl">
-                        {!gameStarted ? "Welcome to Health Run!" : "Game Over!"}
+                        {!gameStarted ? "Welcome to Dash!" : "Game Over!"}
                     </AlertDialogTitle>
                     <AlertDialogDescription asChild>
                       <div>
