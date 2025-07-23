@@ -327,10 +327,10 @@ export default function HealthRunGame() {
                         ) : isLoadingMessage ? (
                            "Analyzing your performance for a tip..."
                         ) : (
-                          <>
-                           <p className="mb-4">Your score: {score}</p>
-                           <p className="font-bold text-primary">{adaptiveMessage}</p>
-                          </>
+                          <div>
+                           <div className="mb-4">Your score: {score}</div>
+                           <div className="font-bold text-primary">{adaptiveMessage}</div>
+                          </div>
                         )}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
