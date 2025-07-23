@@ -16,6 +16,7 @@ import {
 import { generateAdaptiveMessage } from '@/ai/flows/adaptive-message';
 import { Pause, Play, StopCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 type Item = {
   x: number;
@@ -56,6 +57,7 @@ const educationalMessages = [
 export default function HealthRunGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameContainerRef = useRef<HTMLDivElement | null>(null);
+  const playerImageRef = useRef<HTMLImageElement | null>(null);
 
   const [score, setScore] = useState(0);
   const [highscore, setHighscore] = useState(0);
@@ -191,6 +193,11 @@ export default function HealthRunGame() {
     if (storedHighscore) {
       setHighscore(Number(storedHighscore));
     }
+    const image = new window.Image();
+    image.src = '/player.png';
+    image.onload = () => {
+        playerImageRef.current = image;
+    };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
@@ -220,8 +227,13 @@ export default function HealthRunGame() {
       player.dy = 0;
       player.isJumping = false;
     }
-    ctx.fillStyle = '#333';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    if (playerImageRef.current) {
+        ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
+    } else {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
 
     // Update & Draw Items
     itemTimerRef.current++;
@@ -476,3 +488,5 @@ export default function HealthRunGame() {
     </div>
   );
 }
+
+    
