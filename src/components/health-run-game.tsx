@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { generateAdaptiveMessage } from '@/ai/flows/adaptive-message';
+import { Pause, Play, StopCircle } from 'lucide-react';
 
 type Item = {
   x: number;
@@ -50,6 +51,7 @@ export default function HealthRunGame() {
   
   const [isGameOver, setIsGameOver] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const [adaptiveMessage, setAdaptiveMessage] = useState('');
   const [isLoadingMessage, setIsLoadingMessage] = useState(false);
@@ -87,7 +89,6 @@ export default function HealthRunGame() {
       const aspect = 16 / 9;
       let newWidth = Math.min(container.clientWidth, maxWidth);
       
-      // Ensure width isn't 0 if container is hidden initially
       if (newWidth === 0 && container.parentElement) {
           newWidth = Math.min(container.parentElement.clientWidth, maxWidth)
       }
@@ -132,6 +133,7 @@ export default function HealthRunGame() {
     
     setHealth(MAX_HEALTH);
     setAdaptiveMessage('');
+    setIsPaused(false);
   };
 
   const startGame = () => {
@@ -143,6 +145,7 @@ export default function HealthRunGame() {
   const endGame = useCallback(() => {
     setIsGameOver(true);
     setGameStarted(false);
+    setIsPaused(false);
     if (scoreRef.current > highscore) {
       const newHighscore = scoreRef.current;
       setHighscore(newHighscore);
@@ -160,7 +163,7 @@ export default function HealthRunGame() {
   }, [highscore, health]);
 
   const gameLoop = useCallback(() => {
-    if (isGameOver) return;
+    if (isGameOver || isPaused) return;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
@@ -245,10 +248,10 @@ export default function HealthRunGame() {
     gameSpeedRef.current = 5 + (scoreRef.current / 500);
 
     animationFrameId.current = requestAnimationFrame(gameLoop);
-  }, [isGameOver, health, endGame]);
+  }, [isGameOver, health, endGame, isPaused]);
   
   useEffect(() => {
-    if (gameStarted && !isGameOver) {
+    if (gameStarted && !isGameOver && !isPaused) {
       animationFrameId.current = requestAnimationFrame(gameLoop);
     }
     return () => {
@@ -256,16 +259,16 @@ export default function HealthRunGame() {
         cancelAnimationFrame(animationFrameId.current);
       }
     };
-  }, [gameStarted, isGameOver, gameLoop]);
+  }, [gameStarted, isGameOver, gameLoop, isPaused]);
 
   const handleJump = useCallback(() => {
     if (!gameStarted) {
       startGame();
-    } else if (!playerRef.current.isJumping && !isGameOver) {
+    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
       playerRef.current.isJumping = true;
       playerRef.current.dy = playerRef.current.jumpPower;
     }
-  }, [gameStarted, isGameOver, startGame]);
+  }, [gameStarted, isGameOver, startGame, isPaused]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -277,8 +280,13 @@ export default function HealthRunGame() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleJump]);
-  
 
+  const togglePause = () => {
+      if (!isGameOver) {
+          setIsPaused(!isPaused);
+      }
+  }
+  
   return (
     <div ref={gameContainerRef} className="w-full max-w-4xl flex flex-col items-center font-headline">
         <div className="w-full grid grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
@@ -308,6 +316,21 @@ export default function HealthRunGame() {
             </Card>
         </div>
         <canvas ref={canvasRef} onTouchStart={handleJump} className="w-full bg-background rounded-lg shadow-2xl" />
+        
+        <div className="w-full flex justify-center gap-4 mt-4">
+            {gameStarted && (
+                <>
+                    <Button onClick={togglePause} variant="outline">
+                        {isPaused ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
+                        {isPaused ? 'Resume' : 'Pause'}
+                    </Button>
+                    <Button onClick={endGame} variant="destructive">
+                        <StopCircle className="mr-2 h-4 w-4" />
+                        Stop
+                    </Button>
+                </>
+            )}
+        </div>
 
         <AlertDialog open={isGameOver} onOpenChange={setIsGameOver}>
             <AlertDialogContent className="font-headline text-center">
@@ -315,23 +338,25 @@ export default function HealthRunGame() {
                     <AlertDialogTitle className="text-3xl">
                         {!gameStarted ? "Welcome to Health Run!" : "Game Over!"}
                     </AlertDialogTitle>
-                    <AlertDialogDescription className="text-base pt-4">
+                    <AlertDialogDescription asChild>
+                      <div>
                         {!gameStarted ? (
                           <>
-                            Avoid beer cans and collect water bottles to stay healthy.
-                            <br/><br/>
-                            Say NO to underage drinking!
-                            <br/><br/>
-                            <span className="font-bold">Press Space or Tap to Jump.</span>
+                            <p className="text-base pt-4">Avoid beer cans and collect water bottles to stay healthy.</p>
+                            <br/>
+                            <p className="text-base">Say NO to underage drinking!</p>
+                            <br/>
+                            <p className="font-bold text-base">Press Space or Tap to Jump.</p>
                           </>
                         ) : isLoadingMessage ? (
-                           "Analyzing your performance for a tip..."
+                           <p className="text-base pt-4">Analyzing your performance for a tip...</p>
                         ) : (
                           <div>
-                           <div className="mb-4">Your score: {score}</div>
-                           <div className="font-bold text-primary">{adaptiveMessage}</div>
+                           <p className="mb-4 text-base">Your score: {score}</p>
+                           <p className="font-bold text-primary text-base">{adaptiveMessage}</p>
                           </div>
                         )}
+                        </div>
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="sm:justify-center">
