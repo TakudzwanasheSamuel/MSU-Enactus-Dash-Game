@@ -23,6 +23,7 @@ type Item = {
   width: number;
   height: number;
   type: 'beer' | 'water';
+  isFlying?: boolean;
 };
 
 type Player = {
@@ -85,7 +86,7 @@ export default function HealthRunGame() {
   const itemsRef = useRef<Item[]>([]);
   const gameSpeedRef = useRef(5);
   const itemTimerRef = useRef(0);
-  const scoreRef = useRef(0);
+  const scoreRef = useRef(score);
   const animationFrameId = useRef<number>();
   const shownMessagesRef = useRef<Set<number>>(new Set());
   const { toast } = useToast();
@@ -116,13 +117,16 @@ export default function HealthRunGame() {
     }
   }, []);
 
+  const startGame = useCallback(() => {
+    resetGame();
+    setGameStarted(true);
+    setIsGameOver(false);
+  }, []);
+
   const resetGame = useCallback(() => {
     setScore(0);
     scoreRef.current = 0;
-    gameSpeedRef.current = 5;
-    itemsRef.current = [];
-    itemTimerRef.current = 0;
-    shownMessagesRef.current.clear();
+    setHealth(MAX_HEALTH);
     
     const canvas = canvasRef.current;
     if (canvas) {
@@ -133,7 +137,10 @@ export default function HealthRunGame() {
     playerRef.current.dy = 0;
     playerRef.current.isJumping = false;
     
-    setHealth(MAX_HEALTH);
+    itemsRef.current = [];
+    gameSpeedRef.current = 5;
+    itemTimerRef.current = 0;
+    shownMessagesRef.current.clear();
     setAdaptiveMessage('');
     setIsPaused(false);
   }, [resizeCanvas]);
@@ -161,20 +168,15 @@ export default function HealthRunGame() {
       .finally(() => setIsLoadingMessage(false));
   }, [highscore, health]);
 
-  const startGame = useCallback(() => {
-    resetGame();
-    setGameStarted(true);
-    setIsGameOver(false);
-  }, [resetGame]);
-
   const handleJump = useCallback(() => {
-    if (isGameOver) {
+    if (isGameOver && gameStarted) return;
+    if (isGameOver && !gameStarted) {
       startGame();
     } else if (!playerRef.current.isJumping && !isPaused) {
       playerRef.current.isJumping = true;
       playerRef.current.dy = playerRef.current.jumpPower;
     }
-  }, [isGameOver, isPaused, startGame]);
+  }, [isGameOver, isPaused, startGame, gameStarted]);
 
   const updateHealth = useCallback((newHealth: number) => {
     const clampedHealth = Math.max(0, Math.min(MAX_HEALTH, newHealth));
@@ -226,26 +228,31 @@ export default function HealthRunGame() {
     
     let itemSpawnThreshold = 120 - (scoreRef.current / 100);
     if (scoreRef.current > 1000) {
-        itemSpawnThreshold = 120 - (scoreRef.current / 50); // Spawn faster after 1000
+        itemSpawnThreshold = Math.max(30, 90 - (scoreRef.current - 1000) / 40);
     }
 
-    if (itemTimerRef.current > itemSpawnThreshold && itemsRef.current.length < 7) {
-        const beerChance = scoreRef.current > 1000 ? 0.8 : 0.65;
-        const doubleBeerChance = scoreRef.current > 1000 ? 0.3 : 0;
+    if (itemTimerRef.current > itemSpawnThreshold && itemsRef.current.length < 10) {
+        const beerChance = scoreRef.current > 1000 ? 0.85 : 0.65;
+        const doubleBeerChance = scoreRef.current > 1000 ? 0.4 : 0;
+        const flyingBeerChance = scoreRef.current > 1200 ? 0.25 : 0;
         
         const itemType = Math.random() < beerChance ? 'beer' : 'water';
         const height = itemType === 'beer' ? 30 : 40;
         const width = 20;
+        const isFlying = itemType === 'beer' && Math.random() < flyingBeerChance;
+        const yPos = isFlying ? canvas.height - height - 10 - 60 : canvas.height - height - 10;
+
 
         itemsRef.current.push({
             x: canvas.width,
-            y: canvas.height - height - 10,
+            y: yPos,
             width,
             height,
             type: itemType,
+            isFlying,
         });
 
-        if (itemType === 'beer' && Math.random() < doubleBeerChance) {
+        if (itemType === 'beer' && !isFlying && Math.random() < doubleBeerChance) {
              itemsRef.current.push({
                 x: canvas.width + width + 10, // Spawn second beer can right after the first
                 y: canvas.height - height - 10,
@@ -264,6 +271,12 @@ export default function HealthRunGame() {
             ctx.fillRect(item.x, item.y, item.width, item.height);
             ctx.fillStyle = '#C0C0C0';
             ctx.fillRect(item.x, item.y, item.width, 4);
+            if (item.isFlying) {
+                // simple wings
+                ctx.fillStyle = '#E0E0E0';
+                ctx.fillRect(item.x - 5, item.y + 10, 5, 10);
+                ctx.fillRect(item.x + item.width, item.y + 10, 5, 10);
+            }
         } else {
             ctx.fillStyle = '#00BFFF';
             ctx.fillRect(item.x, item.y, item.width, item.height);
@@ -298,7 +311,7 @@ export default function HealthRunGame() {
     scoreRef.current++;
     setScore(scoreRef.current);
     if (scoreRef.current > 1000) {
-        gameSpeedRef.current = 5 + (scoreRef.current / 250); // Faster speed increase after 1000
+        gameSpeedRef.current = 5 + (scoreRef.current / 200); // Faster speed increase after 1000
     } else {
         gameSpeedRef.current = 5 + (scoreRef.current / 500);
     }
