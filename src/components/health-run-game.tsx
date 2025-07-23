@@ -120,9 +120,20 @@ export default function HealthRunGame() {
   }, []);
 
   const startGame = useCallback(() => {
-    resetGame();
-    setGameStarted(true);
-    setIsGameOver(false);
+    if (playerImageRef.current?.complete) {
+        resetGame();
+        setGameStarted(true);
+        setIsGameOver(false);
+    } else {
+        // Image not loaded yet, wait for it
+        if (playerImageRef.current) {
+            playerImageRef.current.onload = () => {
+                resetGame();
+                setGameStarted(true);
+                setIsGameOver(false);
+            }
+        }
+    }
   }, []);
 
   const resetGame = useCallback(() => {
@@ -195,9 +206,8 @@ export default function HealthRunGame() {
     }
     const image = new window.Image();
     image.src = '/player.png';
-    image.onload = () => {
-        playerImageRef.current = image;
-    };
+    playerImageRef.current = image;
+
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
@@ -228,7 +238,7 @@ export default function HealthRunGame() {
       player.isJumping = false;
     }
 
-    if (playerImageRef.current) {
+    if (playerImageRef.current && playerImageRef.current.complete) {
         ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
     } else {
         ctx.fillStyle = '#333';
@@ -488,5 +498,3 @@ export default function HealthRunGame() {
     </div>
   );
 }
-
-    
