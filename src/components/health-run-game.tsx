@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { generateAdaptiveMessage } from '@/ai/flows/adaptive-message';
 import { Pause, Play, StopCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 type Item = {
   x: number;
@@ -40,6 +41,16 @@ const BEER_DAMAGE = 34;
 const WATER_HEAL = 15;
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 70;
+
+const educationalMessages = [
+    { score: 200, message: "Did you know? Alcohol is a depressant that slows down the brain and body." },
+    { score: 500, message: "Underage drinking can lead to poor decision-making and long-term health problems." },
+    { score: 1000, message: "The brain is still developing during the teen years, and alcohol can harm this process." },
+    { score: 1500, message: "Mixing alcohol with energy drinks is a dangerous combination." },
+    { score: 2000, message: "It's okay to say 'no' to peer pressure. True friends will respect your decision." },
+    { score: 2500, message: "Alcohol can impair coordination and judgment, increasing the risk of accidents and injuries." },
+    { score: 3000, message: "Binge drinking can lead to alcohol poisoning, a serious and sometimes deadly condition." },
+];
 
 export default function HealthRunGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -76,6 +87,8 @@ export default function HealthRunGame() {
   const itemTimerRef = useRef(0);
   const scoreRef = useRef(0);
   const animationFrameId = useRef<number>();
+  const shownMessagesRef = useRef<Set<number>>(new Set());
+  const { toast } = useToast();
 
   const updateHealth = (newHealth: number) => {
     const clampedHealth = Math.max(0, Math.min(MAX_HEALTH, newHealth));
@@ -127,6 +140,7 @@ export default function HealthRunGame() {
     gameSpeedRef.current = 5;
     itemsRef.current = [];
     itemTimerRef.current = 0;
+    shownMessagesRef.current.clear();
     
     const canvas = canvasRef.current;
     if (canvas) {
@@ -261,8 +275,20 @@ export default function HealthRunGame() {
     setScore(scoreRef.current);
     gameSpeedRef.current = 5 + (scoreRef.current / 500);
 
+    // Check for educational messages
+    for (const msg of educationalMessages) {
+        if (scoreRef.current >= msg.score && !shownMessagesRef.current.has(msg.score)) {
+            toast({
+                title: "Health Fact!",
+                description: msg.message,
+                duration: 5000,
+            });
+            shownMessagesRef.current.add(msg.score);
+        }
+    }
+
     animationFrameId.current = requestAnimationFrame(gameLoop);
-  }, [isGameOver, health, endGame, isPaused]);
+  }, [isGameOver, health, endGame, isPaused, toast]);
   
   useEffect(() => {
     if (gameStarted && !isGameOver && !isPaused) {
