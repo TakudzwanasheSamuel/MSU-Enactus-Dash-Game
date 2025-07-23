@@ -90,69 +90,6 @@ export default function HealthRunGame() {
   const shownMessagesRef = useRef<Set<number>>(new Set());
   const { toast } = useToast();
 
-  const resetGame = useCallback(() => {
-    setScore(0);
-    scoreRef.current = 0;
-    gameSpeedRef.current = 5;
-    itemsRef.current = [];
-    itemTimerRef.current = 0;
-    shownMessagesRef.current.clear();
-    
-    const canvas = canvasRef.current;
-    if (canvas) {
-        playerRef.current.y = canvas.height - playerRef.current.height;
-    }
-    playerRef.current.dy = 0;
-    playerRef.current.isJumping = false;
-    
-    setHealth(MAX_HEALTH);
-    setAdaptiveMessage('');
-    setIsPaused(false);
-  }, []);
-
-  const endGame = useCallback(() => {
-    setIsGameOver(true);
-    setGameStarted(false);
-    setIsPaused(false);
-    if (scoreRef.current > highscore) {
-      const newHighscore = scoreRef.current;
-      setHighscore(newHighscore);
-      localStorage.setItem('healthRunHighscore', String(newHighscore));
-    }
-
-    setIsLoadingMessage(true);
-    generateAdaptiveMessage({ score: scoreRef.current, health })
-      .then(result => setAdaptiveMessage(result.message))
-      .catch(error => {
-        console.error("Failed to generate message:", error);
-        setAdaptiveMessage("Remember to always make healthy choices.");
-      })
-      .finally(() => setIsLoadingMessage(false));
-  }, [highscore, health]);
-
-  const startGame = useCallback(() => {
-    resetGame();
-    setGameStarted(true);
-    setIsGameOver(false);
-  }, [resetGame]);
-
-  const handleJump = useCallback(() => {
-    if (!gameStarted) {
-      startGame();
-    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
-      playerRef.current.isJumping = true;
-      playerRef.current.dy = playerRef.current.jumpPower;
-    }
-  }, [gameStarted, isGameOver, isPaused, startGame]);
-
-  const updateHealth = (newHealth: number) => {
-    const clampedHealth = Math.max(0, Math.min(MAX_HEALTH, newHealth));
-    setHealth(clampedHealth);
-    if (clampedHealth <= 0) {
-      endGame();
-    }
-  }
-
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const container = gameContainerRef.current;
@@ -178,6 +115,74 @@ export default function HealthRunGame() {
       player.y = canvas.height - player.height;
     }
   }, []);
+
+  const resetGame = useCallback(() => {
+    setScore(0);
+    scoreRef.current = 0;
+    gameSpeedRef.current = 5;
+    itemsRef.current = [];
+    itemTimerRef.current = 0;
+    shownMessagesRef.current.clear();
+    
+    const canvas = canvasRef.current;
+    if (canvas) {
+        playerRef.current.y = canvas.height - playerRef.current.height;
+    } else {
+        resizeCanvas();
+    }
+    playerRef.current.dy = 0;
+    playerRef.current.isJumping = false;
+    
+    setHealth(MAX_HEALTH);
+    setAdaptiveMessage('');
+    setIsPaused(false);
+  }, [resizeCanvas]);
+
+  const endGame = useCallback(() => {
+    setIsGameOver(true);
+    setGameStarted(false);
+    setIsPaused(false);
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+    }
+    if (scoreRef.current > highscore) {
+      const newHighscore = scoreRef.current;
+      setHighscore(newHighscore);
+      localStorage.setItem('healthRunHighscore', String(newHighscore));
+    }
+
+    setIsLoadingMessage(true);
+    generateAdaptiveMessage({ score: scoreRef.current, health })
+      .then(result => setAdaptiveMessage(result.message))
+      .catch(error => {
+        console.error("Failed to generate message:", error);
+        setAdaptiveMessage("Remember to always make healthy choices.");
+      })
+      .finally(() => setIsLoadingMessage(false));
+  }, [highscore, health]);
+
+  const startGame = useCallback(() => {
+    resetGame();
+    setGameStarted(true);
+    setIsGameOver(false);
+  }, [resetGame]);
+
+  const handleJump = useCallback(() => {
+    if (isGameOver) {
+      startGame();
+    } else if (!playerRef.current.isJumping && !isPaused) {
+      playerRef.current.isJumping = true;
+      playerRef.current.dy = playerRef.current.jumpPower;
+    }
+  }, [isGameOver, isPaused, startGame]);
+
+  const updateHealth = useCallback((newHealth: number) => {
+    const clampedHealth = Math.max(0, Math.min(MAX_HEALTH, newHealth));
+    setHealth(clampedHealth);
+    if (clampedHealth <= 0) {
+      endGame();
+    }
+  }, [endGame]);
 
   useEffect(() => {
     const storedHighscore = localStorage.getItem('healthRunHighscore');
@@ -218,7 +223,13 @@ export default function HealthRunGame() {
 
     // Update & Draw Items
     itemTimerRef.current++;
-    if (itemTimerRef.current > (120 - (scoreRef.current / 100)) && itemsRef.current.length < 7) {
+    
+    let itemSpawnThreshold = 120 - (scoreRef.current / 100);
+    if (scoreRef.current > 1000) {
+        itemSpawnThreshold = 120 - (scoreRef.current / 50); // Spawn faster after 1000
+    }
+
+    if (itemTimerRef.current > itemSpawnThreshold && itemsRef.current.length < 7) {
         const itemType = Math.random() < 0.65 ? 'beer' : 'water';
         const height = itemType === 'beer' ? 30 : 40;
         const width = 20;
@@ -269,10 +280,15 @@ export default function HealthRunGame() {
       }
     });
     
-    // Update Score
+    // Update Score and Difficulty
     scoreRef.current++;
     setScore(scoreRef.current);
-    gameSpeedRef.current = 5 + (scoreRef.current / 500);
+    if (scoreRef.current > 1000) {
+        gameSpeedRef.current = 5 + (scoreRef.current / 250); // Faster speed increase after 1000
+    } else {
+        gameSpeedRef.current = 5 + (scoreRef.current / 500);
+    }
+
 
     // Check for educational messages
     for (const msg of educationalMessages) {
@@ -287,7 +303,7 @@ export default function HealthRunGame() {
     }
 
     animationFrameId.current = requestAnimationFrame(gameLoop);
-  }, [isGameOver, health, endGame, isPaused, toast]);
+  }, [isGameOver, health, isPaused, toast, updateHealth]);
   
   useEffect(() => {
     if (gameStarted && !isGameOver && !isPaused) {
@@ -380,7 +396,7 @@ export default function HealthRunGame() {
         />
         
         <div className="w-full flex justify-center gap-4 mt-4">
-            {gameStarted && (
+            {gameStarted && !isGameOver && (
                 <>
                     <Button onClick={togglePause} variant="outline">
                         {isPaused ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
