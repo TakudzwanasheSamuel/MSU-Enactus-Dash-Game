@@ -55,6 +55,10 @@ export default function HealthRunGame() {
 
   const [adaptiveMessage, setAdaptiveMessage] = useState('');
   const [isLoadingMessage, setIsLoadingMessage] = useState(false);
+  
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50;
 
   const playerRef = useRef<Player>({
     x: 50,
@@ -135,11 +139,21 @@ export default function HealthRunGame() {
     setAdaptiveMessage('');
     setIsPaused(false);
   };
+  
+  const handleJump = useCallback(() => {
+    if (!gameStarted) {
+      startGame();
+    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
+      playerRef.current.isJumping = true;
+      playerRef.current.dy = playerRef.current.jumpPower;
+    }
+  }, [gameStarted, isGameOver, isPaused]);
 
   const startGame = () => {
     resetGame();
     setGameStarted(true);
     setIsGameOver(false);
+    handleJump();
   };
 
   const endGame = useCallback(() => {
@@ -261,15 +275,6 @@ export default function HealthRunGame() {
     };
   }, [gameStarted, isGameOver, gameLoop, isPaused]);
 
-  const handleJump = useCallback(() => {
-    if (!gameStarted) {
-      startGame();
-    } else if (!playerRef.current.isJumping && !isGameOver && !isPaused) {
-      playerRef.current.isJumping = true;
-      playerRef.current.dy = playerRef.current.jumpPower;
-    }
-  }, [gameStarted, isGameOver, startGame, isPaused]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -280,6 +285,31 @@ export default function HealthRunGame() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleJump]);
+  
+  const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientY);
+  };
+
+  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    setTouchEnd(e.targetTouches[0].clientY);
+  };
+  
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) {
+      // It was a tap, not a swipe
+      handleJump();
+      return;
+    }
+    const distance = touchStart - touchEnd;
+    const isSwipeUp = distance > minSwipeDistance;
+    
+    if (isSwipeUp) {
+      handleJump();
+    }
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
 
   const togglePause = () => {
       if (!isGameOver) {
@@ -315,7 +345,13 @@ export default function HealthRunGame() {
                 </CardContent>
             </Card>
         </div>
-        <canvas ref={canvasRef} onTouchStart={handleJump} className="w-full bg-background rounded-lg shadow-2xl" />
+        <canvas 
+          ref={canvasRef} 
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          className="w-full bg-background rounded-lg shadow-2xl" 
+        />
         
         <div className="w-full flex justify-center gap-4 mt-4">
             {gameStarted && (
@@ -346,7 +382,7 @@ export default function HealthRunGame() {
                             <br/>
                             <p className="text-base">Say NO to underage drinking!</p>
                             <br/>
-                            <p className="font-bold text-base">Press Space or Tap to Jump.</p>
+                            <p className="font-bold text-base">Press Space or Tap/Swipe Up to Jump.</p>
                           </>
                         ) : isLoadingMessage ? (
                            <p className="text-base pt-4">Analyzing your performance for a tip...</p>
