@@ -23,7 +23,6 @@ The core mechanic of the game is simple yet challenging:
 - **Educational Pop-ups:** As you reach certain score milestones, educational facts about the dangers of underage drinking are displayed as toast notifications without interrupting the game.
 - **Responsive Design:** The game is fully responsive and optimized for both desktop and mobile devices.
 - **High Score Tracking:** Your highest score is saved locally, so you can always try to beat your personal best.
-- **AI-Powered Feedback:** At the end of each game, an AI-powered message provides personalized, encouraging feedback based on your performance, suggesting healthy habits and choices.
 
 ## Technology Stack
 
@@ -34,7 +33,6 @@ This project is built with a modern web development stack:
 - **Language:** [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/)
 - **UI Components:** [ShadCN UI](https://ui.shadcn.com/)
-- **AI Integration:** [Genkit (by Firebase)](https://firebase.google.com/docs/genkit)
 
 ## Getting Started
 

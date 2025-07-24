@@ -14,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generateAdaptiveMessage } from '@/ai/flows/adaptive-message';
 import { Pause, Play, StopCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -73,9 +72,6 @@ export default function DashGame() {
   const [isGameOver, setIsGameOver] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-
-  const [adaptiveMessage, setAdaptiveMessage] = useState('');
-  const [isLoadingMessage, setIsLoadingMessage] = useState(false);
   
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -144,7 +140,6 @@ export default function DashGame() {
     gameSpeedRef.current = 5;
     itemTimerRef.current = 0;
     shownMessagesRef.current.clear();
-    setAdaptiveMessage('');
     setIsPaused(false);
   }, [resizeCanvas]);
   
@@ -194,16 +189,7 @@ export default function DashGame() {
       setHighscore(newHighscore);
       localStorage.setItem('healthRunHighscore', String(newHighscore));
     }
-
-    setIsLoadingMessage(true);
-    generateAdaptiveMessage({ score: scoreRef.current, health })
-      .then(result => setAdaptiveMessage(result.message))
-      .catch(error => {
-        console.error("Failed to generate message:", error);
-        setAdaptiveMessage("Remember to always make healthy choices.");
-      })
-      .finally(() => setIsLoadingMessage(false));
-  }, [highscore, health]);
+  }, [highscore]);
 
   const handleJump = useCallback(() => {
     if (isGameOver && gameStarted) return;
@@ -517,13 +503,11 @@ export default function DashGame() {
                             <br/>
                             <p className="font-bold text-base">Press Space or Tap/Swipe Up to Jump.</p>
                           </>
-                        ) : isLoadingMessage ? (
-                           <p className="text-base pt-4">Analyzing your performance for a tip...</p>
                         ) : (
-                          <div>
-                           <p className="mb-4 text-base">Your score: {score}</p>
-                           <p className="font-bold text-primary text-base">{adaptiveMessage}</p>
-                          </div>
+                           <div>
+                               <p className="mb-4 text-base">Your score: {score}</p>
+                               <p className="font-bold text-primary text-base">Keep practicing to beat your high score!</p>
+                           </div>
                         )}
                         </div>
                     </AlertDialogDescription>
