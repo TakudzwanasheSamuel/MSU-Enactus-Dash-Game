@@ -44,6 +44,10 @@ const BEER_DAMAGE = 34;
 const WATER_HEAL = 15;
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 70;
+const BEER_WIDTH = 25;
+const BEER_HEIGHT = 40;
+const WATER_WIDTH = 25;
+const WATER_HEIGHT = 40;
 
 const educationalMessages = [
     { score: 200, message: "Did you know? Alcohol is a depressant that slows down the brain and body." },
@@ -59,6 +63,8 @@ export default function DashGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameContainerRef = useRef<HTMLDivElement | null>(null);
   const playerImageRef = useRef<HTMLImageElement | null>(null);
+  const beerImageRef = useRef<HTMLImageElement | null>(null);
+  const waterImageRef = useRef<HTMLImageElement | null>(null);
 
   const [score, setScore] = useState(0);
   const [highscore, setHighscore] = useState(0);
@@ -143,19 +149,36 @@ export default function DashGame() {
   }, [resizeCanvas]);
   
   const startGame = useCallback(() => {
-    if (playerImageRef.current?.complete && !playerImageRef.current.src.includes('broken')) {
+    const allImagesLoaded = 
+        playerImageRef.current?.complete && !playerImageRef.current.src.includes('broken') &&
+        beerImageRef.current?.complete && !beerImageRef.current.src.includes('broken') &&
+        waterImageRef.current?.complete && !waterImageRef.current.src.includes('broken');
+
+    if (allImagesLoaded) {
         resetGame();
         setGameStarted(true);
         setIsGameOver(false);
     } else {
-        // Image not loaded yet, wait for it
-        if (playerImageRef.current) {
-            playerImageRef.current.onload = () => {
-                resetGame();
-                setGameStarted(true);
-                setIsGameOver(false);
-            }
-        }
+        // Wait for all images to load
+        const awaitImages = [
+            playerImageRef.current,
+            beerImageRef.current,
+            waterImageRef.current
+        ].map(img => {
+            return new Promise(resolve => {
+                if (img?.complete) {
+                    resolve(true);
+                } else {
+                    img!.onload = () => resolve(true);
+                    img!.onerror = () => resolve(false); // resolve false on error
+                }
+            });
+        });
+        Promise.all(awaitImages).then(() => {
+            resetGame();
+            setGameStarted(true);
+            setIsGameOver(false);
+        });
     }
   }, [resetGame]);
 
@@ -205,10 +228,22 @@ export default function DashGame() {
     if (storedHighscore) {
       setHighscore(Number(storedHighscore));
     }
-    const image = new window.Image();
-    image.crossOrigin = "anonymous"; // Required for placehold.co images
-    image.src = `https://placehold.co/${PLAYER_WIDTH}x${PLAYER_HEIGHT}.png`;
-    playerImageRef.current = image;
+    
+    // Preload images
+    const playerImg = new window.Image();
+    playerImg.crossOrigin = "anonymous";
+    playerImg.src = `https://placehold.co/${PLAYER_WIDTH}x${PLAYER_HEIGHT}.png`;
+    playerImageRef.current = playerImg;
+
+    const beerImg = new window.Image();
+    beerImg.crossOrigin = "anonymous";
+    beerImg.src = `https://placehold.co/${BEER_WIDTH}x${BEER_HEIGHT}.png`;
+    beerImageRef.current = beerImg;
+
+    const waterImg = new window.Image();
+    waterImg.crossOrigin = "anonymous";
+    waterImg.src = `https://placehold.co/${WATER_WIDTH}x${WATER_HEIGHT}.png`;
+    waterImageRef.current = waterImg;
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
@@ -225,7 +260,7 @@ export default function DashGame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw Ground
-    ctx.fillStyle = '#228B22';
+    ctx.fillStyle = 'hsl(var(--primary))';
     ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
 
     // Update & Draw Player
@@ -245,11 +280,11 @@ export default function DashGame() {
             ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
         } catch (error) {
             console.error("Error drawing player image:", error);
-            ctx.fillStyle = '#333';
+            ctx.fillStyle = 'hsl(var(--primary-foreground))';
             ctx.fillRect(player.x, player.y, player.width, player.height);
         }
     } else {
-        ctx.fillStyle = '#333';
+        ctx.fillStyle = 'hsl(var(--primary-foreground))';
         ctx.fillRect(player.x, player.y, player.width, player.height);
     }
 
@@ -267,8 +302,8 @@ export default function DashGame() {
         const flyingBeerChance = scoreRef.current > 1200 ? 0.25 : 0;
         
         const itemType = Math.random() < beerChance ? 'beer' : 'water';
-        const height = itemType === 'beer' ? 30 : 40;
-        const width = 20;
+        const height = itemType === 'beer' ? BEER_HEIGHT : WATER_HEIGHT;
+        const width = itemType === 'beer' ? BEER_WIDTH : WATER_WIDTH;
         const isFlying = itemType === 'beer' && Math.random() < flyingBeerChance;
         const yPos = isFlying ? canvas.height - height - 10 - 60 : canvas.height - height - 10;
 
@@ -296,22 +331,20 @@ export default function DashGame() {
     
     itemsRef.current.forEach((item, index) => {
         item.x -= gameSpeedRef.current;
-        if (item.type === 'beer') {
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(item.x, item.y, item.width, item.height);
-            ctx.fillStyle = '#C0C0C0';
-            ctx.fillRect(item.x, item.y, item.width, 4);
-            if (item.isFlying) {
-                // simple wings
-                ctx.fillStyle = '#E0E0E0';
-                ctx.fillRect(item.x - 5, item.y + 10, 5, 10);
-                ctx.fillRect(item.x + item.width, item.y + 10, 5, 10);
+        const imgToDraw = item.type === 'beer' ? beerImageRef.current : waterImageRef.current;
+
+        if (imgToDraw && imgToDraw.complete && !imgToDraw.src.includes('broken')) {
+            try {
+                ctx.drawImage(imgToDraw, item.x, item.y, item.width, item.height);
+            } catch (e) {
+                // fallback to rectangle
+                 ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
+                 ctx.fillRect(item.x, item.y, item.width, item.height);
             }
         } else {
-            ctx.fillStyle = '#00BFFF';
+            // fallback to rectangle
+            ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
             ctx.fillRect(item.x, item.y, item.width, item.height);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(item.x, item.y, item.width, 5);
         }
 
         if (item.x + item.width < 0) {
