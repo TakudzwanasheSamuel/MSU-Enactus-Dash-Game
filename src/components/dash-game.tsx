@@ -58,6 +58,41 @@ const educationalMessages = [
     { score: 3000, message: "Binge drinking can lead to alcohol poisoning, a serious and sometimes deadly condition." },
 ];
 
+// Add a pool of educational messages for end-of-game display
+const endGameMessages = [
+  // Brain Development
+  "The brain continues to develop until the mid-20s.",
+  "Alcohol can impair memory, attention, decision-making, and learning.",
+  "Long-term drinking in adolescence is linked to reduced cognitive performance and brain changes.",
+  // Mental Health
+  "Alcohol increases the risk of depression, anxiety, and suicidal behavior.",
+  "Alcohol can worsen underlying mental health disorders and affect emotional regulation.",
+  // Addiction Risk
+  "Starting young increases the chance of developing alcohol dependence later in life.",
+  "Drinking before age 15 makes you 4–5x more likely to develop alcohol abuse or dependence.",
+  // Risky Behavior
+  "Alcohol use increases the risk of unsafe sex, driving under the influence, or violent behavior.",
+  "Alcohol impairs judgment and increases impulsivity.",
+  // Academic and Social Problems
+  "Underage drinking can lead to poor academic performance.",
+  "Alcohol increases truancy, disciplinary issues, and family conflicts.",
+  // Physical Health
+  "Alcohol use increases the risk of liver damage, hormonal imbalances, and delayed puberty.",
+  "Alcohol poisoning is a serious, sometimes fatal, risk—especially with binge drinking.",
+  // Healthy Alternatives
+  "Host alcohol-free game nights, sports competitions, or movie marathons with friends.",
+  "Join school clubs, community groups, or volunteer organizations.",
+  "Try music, art, photography, writing, or filmmaking to channel creativity.",
+  "Sports, martial arts, dance, or gym workouts help reduce stress and boost mental health.",
+  "Physical activity builds confidence and a sense of purpose.",
+  "Meditation, journaling, or yoga can reduce anxiety and improve emotional well-being.",
+  "Alcohol-free drinks like fruit-infused sparkling water, herbal teas, or mocktails are fun substitutes.",
+  // Talk & Support
+  "Peer pressure is real—learn assertiveness skills to say no confidently.",
+  "Talk to a trusted adult, counselor, or friend if you’re feeling overwhelmed or pressured to drink.",
+  "If alcohol use has started, early intervention can prevent long-term damage."
+];
+
 export default function DashGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameContainerRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +139,13 @@ export default function DashGame() {
   const playerSpriteRef = useRef<HTMLImageElement | null>(null);
   const frameCounter = useRef(0);
   const [playerFrame, setPlayerFrame] = useState(0);
+
+  // 1. Add level state
+  const [level, setLevel] = useState(1);
+  const prevLevelRef = useRef(1);
+
+  // Add state to track the current end game message
+  const [endMessage, setEndMessage] = useState("");
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -186,6 +228,7 @@ export default function DashGame() {
     }
   }, [resetGame]);
 
+  // When the game ends, pick a random message
   const endGame = useCallback(() => {
     setIsGameOver(true);
     setGameStarted(false);
@@ -194,10 +237,12 @@ export default function DashGame() {
       cancelAnimationFrame(animationFrameId.current);
     }
     if (scoreRef.current > highscore) {
-      const newHighscore = scoreRef.current;
-      setHighscore(newHighscore);
-      localStorage.setItem('healthRunHighscore', String(newHighscore));
+      setHighscore(scoreRef.current);
+      localStorage.setItem('healthRunHighscore', String(scoreRef.current));
     }
+    // Pick a random end game message
+    const randomIdx = Math.floor(Math.random() * endGameMessages.length);
+    setEndMessage(endGameMessages[randomIdx]);
   }, [highscore]);
 
   const handleJump = useCallback(() => {
@@ -283,7 +328,7 @@ export default function DashGame() {
 
     // Update & Draw Items
     itemTimerRef.current++;
-    let itemSpawnThreshold = 120 - (scoreRef.current / 100);
+    let itemSpawnThreshold = Math.max(30, 120 - (level * 10) - (scoreRef.current / 100));
     if (scoreRef.current > 1000) {
       itemSpawnThreshold = Math.max(30, 90 - (scoreRef.current - 1000) / 40);
     }
@@ -353,11 +398,8 @@ export default function DashGame() {
     // Update Score and Difficulty
     scoreRef.current++;
     setScore(scoreRef.current);
-    if (scoreRef.current > 1000) {
-      gameSpeedRef.current = 5 + (scoreRef.current / 200);
-    } else {
-      gameSpeedRef.current = 5 + (scoreRef.current / 500);
-    }
+    // 3. Use level to increase difficulty in gameLoop
+    gameSpeedRef.current = 5 + (level - 1) * 1.5 + (scoreRef.current / 500);
     // Check for educational messages
     for (const msg of educationalMessages) {
       if (scoreRef.current >= msg.score && !shownMessagesRef.current.has(msg.score)) {
@@ -370,7 +412,7 @@ export default function DashGame() {
       }
     }
     animationFrameId.current = requestAnimationFrame(gameLoop);
-  }, [isGameOver, isPaused, playerFrame, updateHealth, health, endGame, setScore, setHealth, setHighscore, toast, gameStarted, SPRITE_FRAME_COUNT, SPRITE_FRAME_COLS, SPRITE_FRAME_ROWS, SPRITE_ANIMATION_SPEED]);
+  }, [isGameOver, isPaused, playerFrame, updateHealth, health, endGame, setScore, setHealth, setHighscore, toast, gameStarted, SPRITE_FRAME_COUNT, SPRITE_FRAME_COLS, SPRITE_FRAME_ROWS, SPRITE_ANIMATION_SPEED, level]);
 
   useEffect(() => {
     const storedHighscore = localStorage.getItem('healthRunHighscore');
@@ -447,8 +489,24 @@ export default function DashGame() {
     setTouchEnd(null);
   };
 
+  // 2. Level up logic (score-based)
+  useEffect(() => {
+    const newLevel = Math.floor(score / 500) + 1;
+    if (newLevel !== level) {
+      setLevel(newLevel);
+      prevLevelRef.current = newLevel;
+      toast({
+        title: `Level Up!`,
+        description: `You reached Level ${newLevel}!`,
+        duration: 3000,
+      });
+    }
+  }, [score, level, toast]);
+
   return (
-    <div ref={gameContainerRef} className="w-full max-w-4xl flex flex-col items-center font-headline">
+    <>
+      <img src="/enactus.png" alt="Enactus Logo" style={{ display: 'block', margin: '2rem auto 1rem auto', width: 120, height: 'auto' }} />
+      <div ref={gameContainerRef} className="w-full max-w-4xl flex flex-col items-center font-headline">
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
             <Card className="col-span-2 sm:col-span-1">
                 <CardHeader className="p-2 sm:p-4">
@@ -464,6 +522,14 @@ export default function DashGame() {
                 </CardHeader>
                 <CardContent className="p-2 sm:p-4">
                     <p className="text-lg sm:text-2xl">{highscore}</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="p-2 sm:p-4">
+                    <CardTitle className="text-sm sm:text-lg">Level</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-4">
+                    <p className="text-lg sm:text-2xl">{level}</p>
                 </CardContent>
             </Card>
             <Card className="col-span-2">
@@ -506,6 +572,9 @@ export default function DashGame() {
                     <AlertDialogTitle className="text-3xl">
                         {!gameStarted ? "Welcome to Dash!" : "Game Over!"}
                     </AlertDialogTitle>
+                    {!gameStarted && (
+                      <img src="/player.png" alt="Player" style={{ width: 100, height: 'auto', margin: '0 auto 1rem auto', display: 'block' }} />
+                    )}
                     <AlertDialogDescription asChild>
                       <div>
                         {!gameStarted ? (
@@ -532,8 +601,14 @@ export default function DashGame() {
                         </Button>
                     </AlertDialogAction>
                 </AlertDialogFooter>
+                {isGameOver && endMessage && (
+                  <div className="text-center text-base text-muted-foreground mt-2 mb-2">
+                    {endMessage}
+                  </div>
+                )}
             </AlertDialogContent>
         </AlertDialog>
     </div>
+  </>
   );
 }
