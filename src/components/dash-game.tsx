@@ -96,6 +96,15 @@ export default function DashGame() {
   const shownMessagesRef = useRef<Set<number>>(new Set());
   const { toast } = useToast();
 
+  // Sprite animation constants
+  const SPRITE_FRAME_COUNT = 6;
+  const SPRITE_FRAME_COLS = 3;
+  const SPRITE_FRAME_ROWS = 2;
+  const SPRITE_ANIMATION_SPEED = 6; // Lower is faster
+  const playerSpriteRef = useRef<HTMLImageElement | null>(null);
+  const frameCounter = useRef(0);
+  const [playerFrame, setPlayerFrame] = useState(0);
+
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const container = gameContainerRef.current;
@@ -209,33 +218,12 @@ export default function DashGame() {
     }
   }, [endGame]);
 
-  useEffect(() => {
-    const storedHighscore = localStorage.getItem('healthRunHighscore');
-    if (storedHighscore) {
-      setHighscore(Number(storedHighscore));
-    }
-    
-    // Preload images
-    const playerImg = new window.Image();
-    playerImg.crossOrigin = "anonymous";
-    playerImg.src = `https://placehold.co/${PLAYER_WIDTH}x${PLAYER_HEIGHT}.png`;
-    playerImageRef.current = playerImg;
-
-    const beerImg = new window.Image();
-    beerImg.crossOrigin = "anonymous";
-    beerImg.src = `https://placehold.co/${BEER_WIDTH}x${BEER_HEIGHT}.png`;
-    beerImageRef.current = beerImg;
-
-    const waterImg = new window.Image();
-    waterImg.crossOrigin = "anonymous";
-    waterImg.src = `https://placehold.co/${WATER_WIDTH}x${WATER_HEIGHT}.png`;
-    waterImageRef.current = waterImg;
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    return () => window.removeEventListener('resize', resizeCanvas);
-  }, [resizeCanvas]);
-
+  const togglePause = () => {
+      if (!isGameOver) {
+          setIsPaused(!isPaused);
+      }
+  }
+  
   const gameLoop = useCallback(() => {
     if (isGameOver || isPaused) return;
     const canvas = canvasRef.current;
@@ -261,83 +249,90 @@ export default function DashGame() {
       player.isJumping = false;
     }
 
-    if (playerImageRef.current && playerImageRef.current.complete && !playerImageRef.current.src.includes('broken')) {
-        try {
-            ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
-        } catch (error) {
-            console.error("Error drawing player image:", error);
-            ctx.fillStyle = 'hsl(var(--primary-foreground))';
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-        }
-    } else {
+    // Animate player sprite
+    frameCounter.current++;
+    if (frameCounter.current % SPRITE_ANIMATION_SPEED === 0) {
+      setPlayerFrame((prev) => (prev + 1) % SPRITE_FRAME_COUNT);
+    }
+
+    // Draw player using sprite sheet
+    if (playerSpriteRef.current && playerSpriteRef.current.complete) {
+      const frameWidth = playerSpriteRef.current.width / SPRITE_FRAME_COLS;
+      const frameHeight = playerSpriteRef.current.height / SPRITE_FRAME_ROWS;
+      const col = playerFrame % SPRITE_FRAME_COLS;
+      const row = Math.floor(playerFrame / SPRITE_FRAME_COLS);
+      ctx.drawImage(
+        playerSpriteRef.current,
+        col * frameWidth, row * frameHeight, // Source x, y
+        frameWidth, frameHeight,             // Source w, h
+        player.x, player.y,                  // Dest x, y
+        player.width, player.height          // Dest w, h
+      );
+    } else if (playerImageRef.current && playerImageRef.current.complete && !playerImageRef.current.src.includes('broken')) {
+      // fallback to static image if sprite not loaded
+      try {
+        ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height);
+      } catch (error) {
         ctx.fillStyle = 'hsl(var(--primary-foreground))';
         ctx.fillRect(player.x, player.y, player.width, player.height);
+      }
+    } else {
+      ctx.fillStyle = 'hsl(var(--primary-foreground))';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
     }
 
     // Update & Draw Items
     itemTimerRef.current++;
-    
     let itemSpawnThreshold = 120 - (scoreRef.current / 100);
     if (scoreRef.current > 1000) {
-        itemSpawnThreshold = Math.max(30, 90 - (scoreRef.current - 1000) / 40);
+      itemSpawnThreshold = Math.max(30, 90 - (scoreRef.current - 1000) / 40);
     }
-
     if (itemTimerRef.current > itemSpawnThreshold && itemsRef.current.length < 10) {
-        const beerChance = scoreRef.current > 1000 ? 0.85 : 0.65;
-        const doubleBeerChance = scoreRef.current > 1000 ? 0.4 : 0;
-        const flyingBeerChance = scoreRef.current > 1200 ? 0.25 : 0;
-        
-        const itemType = Math.random() < beerChance ? 'beer' : 'water';
-        const height = itemType === 'beer' ? BEER_HEIGHT : WATER_HEIGHT;
-        const width = itemType === 'beer' ? BEER_WIDTH : WATER_WIDTH;
-        const isFlying = itemType === 'beer' && Math.random() < flyingBeerChance;
-        const yPos = isFlying ? canvas.height - height - 10 - 60 : canvas.height - height - 10;
-
-
+      const beerChance = scoreRef.current > 1000 ? 0.85 : 0.65;
+      const doubleBeerChance = scoreRef.current > 1000 ? 0.4 : 0;
+      const flyingBeerChance = scoreRef.current > 1200 ? 0.25 : 0;
+      const itemType = Math.random() < beerChance ? 'beer' : 'water';
+      const height = itemType === 'beer' ? BEER_HEIGHT : WATER_HEIGHT;
+      const width = itemType === 'beer' ? BEER_WIDTH : WATER_WIDTH;
+      const isFlying = itemType === 'beer' && Math.random() < flyingBeerChance;
+      const yPos = isFlying ? canvas.height - height - 10 - 60 : canvas.height - height - 10;
+      itemsRef.current.push({
+        x: canvas.width,
+        y: yPos,
+        width,
+        height,
+        type: itemType,
+        isFlying,
+      });
+      if (itemType === 'beer' && !isFlying && Math.random() < doubleBeerChance) {
         itemsRef.current.push({
-            x: canvas.width,
-            y: yPos,
-            width,
-            height,
-            type: itemType,
-            isFlying,
+          x: canvas.width + width + 10,
+          y: canvas.height - height - 10,
+          width,
+          height,
+          type: 'beer',
         });
-
-        if (itemType === 'beer' && !isFlying && Math.random() < doubleBeerChance) {
-             itemsRef.current.push({
-                x: canvas.width + width + 10, // Spawn second beer can right after the first
-                y: canvas.height - height - 10,
-                width,
-                height,
-                type: 'beer',
-            });
-        }
-        itemTimerRef.current = 0;
+      }
+      itemTimerRef.current = 0;
     }
-    
     itemsRef.current.forEach((item, index) => {
-        item.x -= gameSpeedRef.current;
-        const imgToDraw = item.type === 'beer' ? beerImageRef.current : waterImageRef.current;
-
-        if (imgToDraw && imgToDraw.complete && !imgToDraw.src.includes('broken')) {
-            try {
-                ctx.drawImage(imgToDraw, item.x, item.y, item.width, item.height);
-            } catch (e) {
-                // fallback to rectangle
-                 ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
-                 ctx.fillRect(item.x, item.y, item.width, item.height);
-            }
-        } else {
-            // fallback to rectangle
-            ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
-            ctx.fillRect(item.x, item.y, item.width, item.height);
+      item.x -= gameSpeedRef.current;
+      const imgToDraw = item.type === 'beer' ? beerImageRef.current : waterImageRef.current;
+      if (imgToDraw && imgToDraw.complete && !imgToDraw.src.includes('broken')) {
+        try {
+          ctx.drawImage(imgToDraw, item.x, item.y, item.width, item.height);
+        } catch (e) {
+          ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
+          ctx.fillRect(item.x, item.y, item.width, item.height);
         }
-
-        if (item.x + item.width < 0) {
-            itemsRef.current.splice(index, 1);
-        }
+      } else {
+        ctx.fillStyle = item.type === 'beer' ? 'hsl(var(--accent))' : '#00BFFF';
+        ctx.fillRect(item.x, item.y, item.width, item.height);
+      }
+      if (item.x + item.width < 0) {
+        itemsRef.current.splice(index, 1);
+      }
     });
-
     // Check Collisions
     const playerHitbox = { x: player.x + 10, width: player.width - 20, y: player.y, height: player.height };
     itemsRef.current.forEach((item, index) => {
@@ -348,39 +343,62 @@ export default function DashGame() {
         playerHitbox.y + playerHitbox.height > item.y
       ) {
         if (item.type === 'beer') {
-            updateHealth(health - BEER_DAMAGE);
+          updateHealth(health - BEER_DAMAGE);
         } else {
-            updateHealth(health + WATER_HEAL);
+          updateHealth(health + WATER_HEAL);
         }
         itemsRef.current.splice(index, 1);
       }
     });
-    
     // Update Score and Difficulty
     scoreRef.current++;
     setScore(scoreRef.current);
     if (scoreRef.current > 1000) {
-        gameSpeedRef.current = 5 + (scoreRef.current / 200); // Faster speed increase after 1000
+      gameSpeedRef.current = 5 + (scoreRef.current / 200);
     } else {
-        gameSpeedRef.current = 5 + (scoreRef.current / 500);
+      gameSpeedRef.current = 5 + (scoreRef.current / 500);
     }
-
-
     // Check for educational messages
     for (const msg of educationalMessages) {
-        if (scoreRef.current >= msg.score && !shownMessagesRef.current.has(msg.score)) {
-            toast({
-                title: "Health Fact!",
-                description: msg.message,
-                duration: 5000,
-            });
-            shownMessagesRef.current.add(msg.score);
-        }
+      if (scoreRef.current >= msg.score && !shownMessagesRef.current.has(msg.score)) {
+        toast({
+          title: "Health Fact!",
+          description: msg.message,
+          duration: 5000,
+        });
+        shownMessagesRef.current.add(msg.score);
+      }
     }
-
     animationFrameId.current = requestAnimationFrame(gameLoop);
-  }, [isGameOver, health, isPaused, toast, updateHealth]);
-  
+  }, [isGameOver, isPaused, playerFrame, updateHealth, health, endGame, setScore, setHealth, setHighscore, toast, gameStarted, SPRITE_FRAME_COUNT, SPRITE_FRAME_COLS, SPRITE_FRAME_ROWS, SPRITE_ANIMATION_SPEED]);
+
+  useEffect(() => {
+    const storedHighscore = localStorage.getItem('healthRunHighscore');
+    if (storedHighscore) {
+      setHighscore(Number(storedHighscore));
+    }
+    
+    // Preload images
+    const playerImg = new window.Image();
+    playerImg.crossOrigin = "anonymous";
+    playerImg.src = "/player.png"; // Use local image
+    playerImageRef.current = playerImg;
+
+    const beerImg = new window.Image();
+    beerImg.crossOrigin = "anonymous";
+    beerImg.src = "/achohol.png"; // Use local image
+    beerImageRef.current = beerImg;
+
+    const waterImg = new window.Image();
+    waterImg.crossOrigin = "anonymous";
+    waterImg.src = "/water.png"; // Use local image
+    waterImageRef.current = waterImg;
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, [resizeCanvas]);
+
   useEffect(() => {
     if (gameStarted && !isGameOver && !isPaused) {
       animationFrameId.current = requestAnimationFrame(gameLoop);
@@ -411,6 +429,7 @@ export default function DashGame() {
   const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     setTouchEnd(e.targetTouches[0].clientY);
   };
+
   
   const onTouchEnd = () => {
     if (!touchStart || !touchEnd) {
@@ -428,12 +447,6 @@ export default function DashGame() {
     setTouchEnd(null);
   };
 
-  const togglePause = () => {
-      if (!isGameOver) {
-          setIsPaused(!isPaused);
-      }
-  }
-  
   return (
     <div ref={gameContainerRef} className="w-full max-w-4xl flex flex-col items-center font-headline">
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
